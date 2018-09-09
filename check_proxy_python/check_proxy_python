@@ -1,0 +1,69 @@
+#!/usr/bin/env python
+
+import os
+import sys
+import re
+import requests
+import json
+from optparse import OptionParser
+
+
+parser = OptionParser()
+parser.add_option('-u', dest='url'    , action='store'     , help='The url you want to request from the proxy server' )
+parser.add_option('-p', dest='proxy'  , action='store'     , help='The proxy server ip address or fqdn' )
+parser.add_option('-l', dest='port'   , action='store'     , help='The proxy server port' )
+parser.add_option('-t', dest='timeout', action='store'     , help='The total request timeout' )
+args = parser.parse_args()[0]
+
+url, proxy, port, timeout = args.url, args.proxy, args.port, args.timeout
+
+if not url or not proxy or not port:
+    print "Error: Not enough arguments"
+    parser.print_help(sys.stderr)
+    sys.exit(1)
+
+proxies = {
+        'http' : 'http://'+ proxy + ':' + port,
+        'https': 'https://'+ proxy + ':' + port,
+        }
+
+if not timeout:
+    timeout = 10
+
+results = { "proxy_request": {} }
+
+try:
+    response = requests.get(url, proxies=proxies, timeout=int(timeout), allow_redirects=True)
+    response.raise_for_status()
+    results["proxy_request"]["response_code"]  = response.status_code
+    results["proxy_request"]["response_time"]  = response.elapsed.total_seconds()
+    results["proxy_request"]["response_error"] = "OK"
+
+except requests.exceptions.HTTPError as error:
+    results["proxy_request"]["response_code"]  = response.status_code
+    results["proxy_request"]["response_error"] = str(error)
+    results["proxy_request"]["response_time"]  = response.elapsed.total_seconds()
+
+except requests.exceptions.Timeout as error:
+    results["proxy_request"]["response_code"]  = "000"
+    results["proxy_request"]["response_time"]  = "-1"
+    results["proxy_request"]["response_error"] = "Connection to " + proxy + " timed out after " + timeout + " sec"
+
+except requests.exceptions.ConnectionError as error:
+    results["proxy_request"]["response_code"]  = "000"
+    results["proxy_request"]["response_time"]  = "-1"
+    results["proxy_request"]["response_error"] = str(error)
+
+except:
+    results["proxy_request"]["response_code"]  = "000"
+    results["proxy_request"]["response_time"]  = "-1"
+    results["proxy_request"]["response_error"] = "Unknown Error"
+
+results["proxy_request"]["proxy_host"]     = proxy
+results["proxy_request"]["proxy_port"]     = port
+results["proxy_request"]["proxy_timeout"]  = timeout
+results["proxy_request"]["proxy_method"]   = method
+results["proxy_request"]["request_url"]    = url
+
+print json.dumps(results, indent=4, sort_keys=True)
+
